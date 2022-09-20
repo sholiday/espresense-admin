@@ -45,8 +45,8 @@ func NewWebApp(c Config) (*WebApp, error) {
 }
 
 func (a *WebApp) addRoutes() {
-	a.engine.LoadHTMLGlob("*.html")
-	a.engine.StaticFile("/table.js", "./table.js")
+	a.engine.LoadHTMLGlob("assets/*.html")
+	a.engine.StaticFile("/table.js", "assets/table.js")
 	a.engine.GET("/", func(c *gin.Context) {
 		c.HTML(200, "index.html", nil)
 	})
