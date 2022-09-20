@@ -162,6 +162,17 @@ func (a *WebApp) gcLocked() {
 			log.Printf("GC %s %s", id, room)
 		}
 	}
+	// GC devices that have no pings.
+	var toGC []string
+	for id, device := range a.deviceByName {
+		if len(device.Pings) == 0 {
+			toGC = append(toGC, id)
+		}
+	}
+	for _, id := range toGC {
+		delete(a.deviceByName, id)
+		log.Printf("GC %s", id)
+	}
 
 	// GC pingsByMac
 	for rName, room := range a.rooms {
