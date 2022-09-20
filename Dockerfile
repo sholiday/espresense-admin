@@ -28,7 +28,7 @@ RUN set -x && apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -
 COPY --from=builder /app/cmd/server /app/server
 COPY --from=builder /app/assets /app/assets
 
-EXPOSE 6060/tcp
+EXPOSE 12312/tcp
 
 CMD ["/app/server"]
 
