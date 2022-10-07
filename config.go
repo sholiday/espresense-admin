@@ -23,7 +23,8 @@ type ServerConfig struct {
 }
 
 func LoadConfig() (Config, error) {
-	var config Config
+	viper.SetDefault("server.port", 12312)
+	viper.SetDefault("broker.prefix", "espresense")
 	viper.SetEnvPrefix("ESPRESENSE_ADMIN")
 	viper.SetConfigName("espresense-admin")
 	viper.AddConfigPath("$HOME/.config/espresense-admin/")
@@ -31,13 +32,9 @@ func LoadConfig() (Config, error) {
 	viper.AddConfigPath("/config")
 	viper.AddConfigPath(".")
 	viper.AutomaticEnv()
+
+	var config Config
 	err := viper.ReadInConfig()
-	if viper.Get("server.port") == nil {
-		viper.Set("server.port", 12312)
-	}
-	if viper.Get("broker.clientid") == nil {
-		viper.Set("broker.clientid", "mqtt-room-view")
-	}
 	if err != nil {
 		return config, fmt.Errorf("Failed to read config file: %s", err)
 	}

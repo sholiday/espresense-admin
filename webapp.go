@@ -67,9 +67,12 @@ func (a *WebApp) setupMqtt() error {
 	opts := MQTT.NewClientOptions().AddBroker(a.config.Broker.Server)
 	opts.SetUsername(a.config.Broker.Username)
 	opts.SetPassword(a.config.Broker.Password)
-	opts.SetClientID(a.config.Broker.ClientID)
+	if a.config.Broker.ClientID != "" {
+		opts.SetClientID(a.config.Broker.ClientID)
+	}
 
 	c := MQTT.NewClient(opts)
+	log.Println(c.OptionsReader())
 	if token := c.Connect(); token.Wait() && token.Error() != nil {
 		return token.Error()
 	}
@@ -87,6 +90,7 @@ func (a *WebApp) Run() error {
 	if err != nil {
 		return err
 	}
+	a.engine.SetTrustedProxies(nil)
 	a.addRoutes()
 	return a.engine.Run(fmt.Sprintf("%s:%d", a.config.Server.Host, a.config.Server.Port))
 }
@@ -190,6 +194,12 @@ func (a *WebApp) gcLocked() {
 
 	// GC rooms
 	gcThreshold = time.Now().Add(time.Hour)
+	var roomsToGc []string
+	for rName, room := range a.rooms {
+		if room.LastPing.Before(gcThreshold) {
+			toGC = append(roomsToGc, rName)
+		}
+	}
 }
 
 func (a *WebApp) toTableResponse() TableResponse {

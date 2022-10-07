@@ -1,4 +1,4 @@
-FROM golang:1.19-buster as builder
+FROM golang:1.19-bullseye as builder
 
 # Create and change to the app directory.
 WORKDIR /app
@@ -12,23 +12,24 @@ RUN go mod download
 # Copy local code to the container image.
 COPY . ./
 
-WORKDIR /app/cmd/server
 # Build the binary.
-RUN go build -v -o server
+RUN go build -v -o /app/server cmd/server/server.go
 
 # Use the official Debian slim image for a lean production container.
 # https://hub.docker.com/_/debian
 # https://docs.docker.com/develop/develop-images/multistage-build/#use-multi-stage-builds
-FROM debian:buster-slim
+FROM debian:bullseye-slim
 RUN set -x && apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy the binary to the production image from the builder stage.
-COPY --from=builder /app/cmd/server /app/server
+COPY --from=builder /app/server /app/server
+RUN chmod a+x /app/server
 COPY --from=builder /app/assets /app/assets
 
 EXPOSE 12312/tcp
 
+WORKDIR /app
 CMD ["/app/server"]
 
