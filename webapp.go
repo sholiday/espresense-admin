@@ -31,6 +31,18 @@ type Device struct {
 	Pings map[string]*Ping
 }
 
+func (d *Device) Location() string {
+	closest := ""
+	dist := math.MaxFloat64
+	for room, ping := range d.Pings {
+		if ping.Distance < dist {
+			closest = room
+			dist = ping.Distance
+		}
+	}
+	return closest
+}
+
 type Room struct {
 	LastPing   time.Time
 	pingsByMac map[string]*Ping
@@ -66,6 +78,23 @@ func (a *WebApp) addRoutes() {
 		t := a.toThreeD()
 		c.JSON(http.StatusOK, t)
 	})
+	a.engine.GET("/text", a.handleText)
+}
+
+func (a *WebApp) handleText(c *gin.Context) {
+	dName := c.DefaultQuery("name", "")
+	if len(dName) == 0 {
+		c.String(http.StatusBadRequest, "?name is empty")
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	device, ok := a.deviceByName[dName]
+	if !ok {
+		c.String(http.StatusBadRequest, "'%s' was not found", dName)
+		return
+	}
+	location := device.Location()
+	c.String(http.StatusOK, "%s", location)
 }
 
 func (a *WebApp) setupMqtt() error {
@@ -219,15 +248,7 @@ func (a *WebApp) toTableResponse() TableResponse {
 		var e = Entry{
 			"name": id,
 		}
-		closest := ""
-		dist := math.MaxFloat64
-		for room, ping := range device.Pings {
-			if ping.Distance < dist {
-				closest = room
-				dist = ping.Distance
-			}
-		}
-		e["closest"] = closest
+		e["closest"] = device.Location()
 		for room := range a.rooms {
 			if val, ok := device.Pings[room]; ok {
 				e[room] = fmt.Sprintf("%.1f", val.Distance)
