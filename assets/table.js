@@ -1,6 +1,10 @@
 $(document).ready(function() {
-  $.getJSON("/table", function(data) {
-    var items = [ {data : 'name', name : 'Device'}, {data : 'closest'} ];
+  $.getJSON("/table-dev", function(data) {
+    var items = [
+      {data : 'mac'}, {data: 'idtype'}, {data : 'name', name : 'Device'}, {data : 'disc'},
+      {data : 'closest'}
+    ];
+
     for (i = 0; i < data.rooms.length; i++) {
       items.push({data : data.rooms[i]});
     }
@@ -15,7 +19,7 @@ $(document).ready(function() {
       scrollCollapse : true,
       paging : false,
       ajax : {
-        "url" : "/table",
+        "url" : "/table-dev",
       },
       columns : items,
     });

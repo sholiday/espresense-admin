@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -55,6 +56,10 @@ func (a *WebApp) addRoutes() {
 	})
 	a.engine.GET("/table", func(c *gin.Context) {
 		t := a.toTableResponse()
+		c.JSON(http.StatusOK, t)
+	})
+	a.engine.GET("/table-dev", func(c *gin.Context) {
+		t := a.toTableResponseDevices()
 		c.JSON(http.StatusOK, t)
 	})
 	a.engine.GET("/3d", func(c *gin.Context) {
@@ -193,7 +198,7 @@ func (a *WebApp) gcLocked() {
 	}
 
 	// GC rooms
-	gcThreshold = time.Now().Add(time.Hour)
+	gcThreshold = time.Now().Add(-1 * time.Hour)
 	var roomsToGc []string
 	for rName, room := range a.rooms {
 		if room.LastPing.Before(gcThreshold) {
@@ -232,6 +237,68 @@ func (a *WebApp) toTableResponse() TableResponse {
 		}
 		t.Data = append(t.Data, e)
 	}
+	return t
+}
+
+func (a *WebApp) toTableResponseDevices() TableResponse {
+	var t TableResponse
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.gcLocked()
+	type Dev struct {
+		Rooms map[string]*Ping
+	}
+	byMac := map[string]*Dev{}
+	for rName, room := range a.rooms {
+		t.Rooms = append(t.Rooms, rName)
+		for mac, ping := range room.pingsByMac {
+			dEntry := byMac[mac]
+			if dEntry == nil {
+				dEntry = &Dev{
+					Rooms: map[string]*Ping{},
+				}
+				byMac[mac] = dEntry
+			}
+			dEntry.Rooms[rName] = ping
+		}
+	}
+
+	for mac, device := range byMac {
+		var e = Entry{
+			"mac":    mac,
+			"name":   "",
+			"disc":   "",
+			"idtype": "",
+		}
+		closest := ""
+		dist := math.MaxFloat64
+		for room, ping := range device.Rooms {
+			e["name"] = ping.ID
+			e["disc"] = ping.Disc
+			if val, ok := idTypes[ping.IDType]; ok {
+				e["idtype"] = val
+
+			} else {
+				e["idtype"] = fmt.Sprintf("%d", ping.IDType)
+			}
+			if ping.Distance < dist {
+				closest = room
+				dist = ping.Distance
+			}
+		}
+		e["closest"] = closest
+		for room := range a.rooms {
+			if val, ok := device.Rooms[room]; ok {
+				e[room] = fmt.Sprintf("%.1f", val.Distance)
+			} else {
+				e[room] = ""
+			}
+		}
+		t.Data = append(t.Data, e)
+	}
+	sort.Slice(t.Data, func(i, j int) bool {
+		return t.Data[i]["mac"] < t.Data[j]["mac"]
+	})
 	return t
 }
 
