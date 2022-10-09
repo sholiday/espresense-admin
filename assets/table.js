@@ -1,7 +1,9 @@
 $(document).ready(function() {
   $.getJSON("/table-dev", function(data) {
     var items = [
-      {data : 'mac'}, {data: 'idtype'}, {data : 'name', name : 'Device'}, {data : 'disc'},
+      {data : 'mac'}, 
+      {data: 'manuf'},
+      {data: 'idtype'}, {data : 'name', name : 'Device'}, {data : 'disc'},
       {data : 'closest'}
     ];
 

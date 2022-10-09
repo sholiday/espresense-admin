@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/GPORTALcloud/ouidb/pkg/ouidb"
 	"github.com/gin-gonic/gin"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
@@ -20,11 +21,13 @@ import (
 type WebApp struct {
 	config Config
 	engine *gin.Engine
+	ouidb  *ouidb.OuiDB
 
 	// Synced datastructures
 	mu           sync.Mutex
 	deviceByName map[string]*Device
 	rooms        map[string]*Room
+	manufByMac   map[string]string
 }
 
 type Device struct {
@@ -49,11 +52,18 @@ type Room struct {
 }
 
 func NewWebApp(c Config) (*WebApp, error) {
+	db, err := ouidb.New()
+	if err != nil {
+		return nil, err
+	}
+	//db := ouidb.New("manuf")
 	return &WebApp{
 		config:       c,
 		engine:       gin.Default(),
+		ouidb:        db,
 		deviceByName: map[string]*Device{},
 		rooms:        map[string]*Room{},
+		manufByMac:   map[string]string{},
 	}, nil
 }
 
@@ -152,11 +162,27 @@ func (a *WebApp) mqttHandlerRoom(client MQTT.Client, msg MQTT.Message) {
 	json.Unmarshal(msg.Payload(), &ping)
 	ping.Recieved = t
 
+	mac := macColons(ping.Mac)
+
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	room := a.getOrInsertRoomLocked(roomName)
 	room.LastPing = t
 	room.pingsByMac[ping.Mac] = &ping
+	if _, ok := a.manufByMac[ping.Mac]; !ok {
+		manuf, err := a.ouidb.Lookup(mac)
+		if err != nil && err != ouidb.NotFoundErr {
+			log.Println(err)
+		}
+		a.manufByMac[ping.Mac] = manuf
+	}
+}
+
+func macColons(in string) string {
+	if len(in) != 12 {
+		return ""
+	}
+	return fmt.Sprintf("%s:%s:%s:%s:%s:%s", in[0:2], in[2:4], in[4:6], in[6:8], in[8:10], in[10:12])
 }
 
 func (a *WebApp) mqttHandlerDevice(client MQTT.Client, msg MQTT.Message) {
@@ -290,6 +316,7 @@ func (a *WebApp) toTableResponseDevices() TableResponse {
 			"name":   "",
 			"disc":   "",
 			"idtype": "",
+			"manuf":  a.manufByMac[mac],
 		}
 		closest := ""
 		dist := math.MaxFloat64

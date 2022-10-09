@@ -3,6 +3,7 @@ module github.com/sholiday/espresense-admin
 go 1.17
 
 require (
+	github.com/GPORTALcloud/ouidb v0.0.0-20210804110001-51048950b071
 	github.com/eclipse/paho.mqtt.golang v1.4.1
 	github.com/gin-gonic/gin v1.8.1
 )
