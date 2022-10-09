@@ -5,9 +5,11 @@ import (
 	"math"
 
 	"fmt"
+	"github.com/davidscholberg/go-durationfmt"
 	"log"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -49,6 +51,7 @@ func (d *Device) Location() string {
 type Room struct {
 	LastPing   time.Time
 	pingsByMac map[string]*Ping
+	Telemetry  Telemetry
 }
 
 func NewWebApp(c Config) (*WebApp, error) {
@@ -82,6 +85,10 @@ func (a *WebApp) addRoutes() {
 	})
 	a.engine.GET("/table-dev", func(c *gin.Context) {
 		t := a.toTableResponseDevices()
+		c.JSON(http.StatusOK, t)
+	})
+	a.engine.GET("/table-rooms", func(c *gin.Context) {
+		t := a.toTableResponseRooms()
 		c.JSON(http.StatusOK, t)
 	})
 	a.engine.GET("/3d", func(c *gin.Context) {
@@ -123,7 +130,7 @@ func (a *WebApp) setupMqtt() error {
 	if token := c.Subscribe("espresense/devices/#", 0, a.mqttHandlerDevice); token.Wait() && token.Error() != nil {
 		return token.Error()
 	}
-	if token := c.Subscribe("espresense/rooms/+", 0, a.mqttHandlerRoom); token.Wait() && token.Error() != nil {
+	if token := c.Subscribe("espresense/rooms/#", 0, a.mqttHandlerRoom); token.Wait() && token.Error() != nil {
 		return token.Error()
 	}
 	return nil
@@ -152,14 +159,44 @@ func (a *WebApp) getOrInsertRoomLocked(roomName string) *Room {
 }
 
 func (a *WebApp) mqttHandlerRoom(client MQTT.Client, msg MQTT.Message) {
-	t := time.Now()
 	topic := msg.Topic()
 
 	tParts := strings.Split(topic, "/")
+
 	roomName := tParts[2]
 
+	if len(tParts) == 3 {
+		a.mqttHandlerRoomDevice(client, msg, roomName)
+		return
+	}
+	if tParts[3] == "telemetry" {
+		a.mqttHandlerRoomTelem(client, msg, roomName)
+		return
+	}
+
+}
+func (a *WebApp) mqttHandlerRoomTelem(client MQTT.Client, msg MQTT.Message, roomName string) {
+	t := time.Now()
+	var telem Telemetry
+	err := json.Unmarshal(msg.Payload(), &telem)
+	if err != nil {
+		log.Fatal(err, "\t", string(msg.Payload()))
+	}
+	telem.Recieved = t
+
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	room := a.getOrInsertRoomLocked(roomName)
+	room.Telemetry = telem
+}
+
+func (a *WebApp) mqttHandlerRoomDevice(client MQTT.Client, msg MQTT.Message, roomName string) {
+	t := time.Now()
 	var ping Ping
-	json.Unmarshal(msg.Payload(), &ping)
+	err := json.Unmarshal(msg.Payload(), &ping)
+	if err != nil {
+		log.Fatal(err, "\t", string(msg.Payload()))
+	}
 	ping.Recieved = t
 
 	mac := macColons(ping.Mac)
@@ -347,6 +384,34 @@ func (a *WebApp) toTableResponseDevices() TableResponse {
 	sort.Slice(t.Data, func(i, j int) bool {
 		return t.Data[i]["mac"] < t.Data[j]["mac"]
 	})
+	return t
+}
+
+func (a *WebApp) toTableResponseRooms() TableResponse {
+	var t TableResponse
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.gcLocked()
+	for name, room := range a.rooms {
+		durStr, err := durationfmt.Format(room.Telemetry.UptimeDuration(), "%dd%hh")
+		if err != nil {
+			fmt.Println(err)
+		}
+		e := Entry{
+			"name":     name,
+			"IP":       room.Telemetry.IP,
+			"Uptime":   durStr,
+			"Firm":     room.Telemetry.Firm,
+			"Ver":      room.Telemetry.Ver,
+			"Rssi":     strconv.Itoa(room.Telemetry.Rssi),
+			"Adverts":  strconv.Itoa(room.Telemetry.Adverts),
+			"Seen":     strconv.Itoa(room.Telemetry.Seen),
+			"Queried":  strconv.Itoa(room.Telemetry.Queried),
+			"Reported": strconv.Itoa(room.Telemetry.Reported),
+		}
+		t.Data = append(t.Data, e)
+	}
+
 	return t
 }
 

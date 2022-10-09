@@ -1,6 +1,8 @@
 package eadmin
 
-import "time"
+import (
+	"time"
+)
 
 type Ping struct {
 	ID       string  `json:"id"`
@@ -54,4 +56,26 @@ var idTypes = map[int]string{
 	200: "KNOWN_IRK",
 	210: "KNOWN_MAC",
 	250: "ALIAS",
+}
+
+type Telemetry struct {
+	IP              string  `json:"ip"`
+	Uptime          int     `json:"uptime"`
+	Firm            string  `json:"firm"`
+	Rssi            int     `json:"rssi"`
+	Ver             string  `json:"ver"`
+	Adverts         int     `json:"adverts"`
+	Seen            int     `json:"seen"`
+	Queried         int     `json:"queried"`
+	Reported        int     `json:"reported"`
+	FreeHeap        int     `json:"freeHeap"`
+	MaxAllocHeap    int     `json:"maxAllocHeap"`
+	MemFrag         float64 `json:"memFrag"`
+	ScanHighWater   int     `json:"scanHighWater"`
+	ReportHighWater int     `json:"reportHighWater"`
+	Recieved        time.Time
+}
+
+func (t Telemetry) UptimeDuration() time.Duration {
+	return time.Duration(t.Uptime) * time.Second
 }

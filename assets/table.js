@@ -30,3 +30,31 @@ $(document).ready(function() {
     }, 500);
   });
 });
+
+$(document).ready(function() {
+  $.getJSON("/table-rooms", function(data) {
+    var items = [
+      {data : 'name'}, {data : 'IP'}, {data : 'Uptime'}, {data : 'Firm'},
+      {data : 'Ver'}, {data : 'Rssi'}, {data : 'Adverts'}, {data : 'Seen'},
+      {data : 'Queried'}, {data : 'Reported'}
+    ];
+
+    for (i = 0; i < items.length; i++) {
+      $("#rcol-head").append('<th>' + items[i].data + '</th>');
+      $("#rcol-footer").append('<th>' + items[i].data + '</th>');
+    }
+
+    var table1 = $('#rooms').DataTable({
+      scrollY : '500px',
+      scrollCollapse : true,
+      paging : false,
+      ajax : {
+        "url" : "/table-rooms",
+      },
+      columns : items,
+    });
+    setInterval(function() {
+      table1.ajax.reload(null, false); // user paging is not reset on reload
+    }, 2000);
+  });
+});

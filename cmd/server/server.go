@@ -1,9 +1,14 @@
 package main
 
-import "fmt"
-import eadmin "github.com/sholiday/espresense-admin"
+import (
+	"fmt"
+	eadmin "github.com/sholiday/espresense-admin"
+	"log"
+)
 
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
 	c, err := eadmin.LoadConfig()
 	if err != nil {
 		fmt.Println(err)
