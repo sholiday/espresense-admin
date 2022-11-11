@@ -4,6 +4,7 @@ go 1.17
 
 require (
 	github.com/GPORTALcloud/ouidb v0.0.0-20210804110001-51048950b071
+	github.com/benbjohnson/clock v1.3.0
 	github.com/davidscholberg/go-durationfmt v0.0.0-20170122144659-64843a2083d3
 	github.com/eclipse/paho.mqtt.golang v1.4.1
 	github.com/gin-gonic/gin v1.8.1

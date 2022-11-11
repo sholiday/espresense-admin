@@ -3,11 +3,13 @@ package eadmin
 import (
 	"testing"
 
+	"github.com/benbjohnson/clock"
 	"github.com/stretchr/testify/assert"
 )
 
 func newTestWebApp(t *testing.T) *WebApp {
 	return &WebApp{
+		clock:        clock.NewMock(),
 		deviceByName: map[string]*Device{},
 		rooms:        map[string]*Room{},
 		manufByMac:   map[string]string{},
@@ -47,4 +49,5 @@ func TestHandleRoomTelem(t *testing.T) {
 	val, ok := wa.rooms["room_name"]
 	assert.True(t, ok)
 	assert.Equal(t, val.Telemetry.Queried, 2)
+	assert.Equal(t, val.Telemetry.Recieved, wa.clock.Now())
 }
