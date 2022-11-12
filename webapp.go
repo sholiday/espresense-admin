@@ -117,6 +117,26 @@ func (a *WebApp) handleText(c *gin.Context) {
 	c.String(http.StatusOK, "%s", location)
 }
 
+func (a *WebApp) onConnect(c MQTT.Client) {
+	log.Println("MQTT: Connected.")
+	if token := c.Subscribe("espresense/devices/#", 0, a.mqttHandlerDevice); token.Wait() && token.Error() != nil {
+		log.Fatal(token.Error())
+		return
+	}
+	if token := c.Subscribe("espresense/rooms/#", 0, a.mqttHandlerRoom); token.Wait() && token.Error() != nil {
+		log.Fatal(token.Error())
+		return
+	}
+}
+
+func (a *WebApp) onConnectionLost(c MQTT.Client, e error) {
+	log.Println("MQTT: Connection lost.", e)
+}
+
+func (a *WebApp) onReconnecting(c MQTT.Client, o *MQTT.ClientOptions) {
+	log.Println("MQTT: Reconnecting")
+}
+
 func (a *WebApp) setupMqtt() error {
 	opts := MQTT.NewClientOptions().AddBroker(a.config.Broker.Server)
 	opts.SetUsername(a.config.Broker.Username)
@@ -124,16 +144,16 @@ func (a *WebApp) setupMqtt() error {
 	if a.config.Broker.ClientID != "" {
 		opts.SetClientID(a.config.Broker.ClientID)
 	}
+	opts.SetOrderMatters(false)
+	// This is the default, but let's be explicit.
+	opts.SetCleanSession(true)
+	opts.SetOnConnectHandler(a.onConnect)
+	opts.SetConnectionLostHandler(a.onConnectionLost)
+	opts.SetReconnectingHandler(a.onReconnecting)
 
 	c := MQTT.NewClient(opts)
 	log.Println(c.OptionsReader())
 	if token := c.Connect(); token.Wait() && token.Error() != nil {
-		return token.Error()
-	}
-	if token := c.Subscribe("espresense/devices/#", 0, a.mqttHandlerDevice); token.Wait() && token.Error() != nil {
-		return token.Error()
-	}
-	if token := c.Subscribe("espresense/rooms/#", 0, a.mqttHandlerRoom); token.Wait() && token.Error() != nil {
 		return token.Error()
 	}
 	return nil
@@ -198,7 +218,8 @@ func (a *WebApp) mqttHandlerRoomDevice(client MQTT.Client, msg MQTT.Message, roo
 	var ping Ping
 	err := json.Unmarshal(msg.Payload(), &ping)
 	if err != nil {
-		log.Fatal(err, "\t", string(msg.Payload()))
+		log.Print(err, "\t", string(msg.Payload()))
+		return
 	}
 	ping.Recieved = t
 
