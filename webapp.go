@@ -62,7 +62,6 @@ func NewWebApp(c Config) (*WebApp, error) {
 	if err != nil {
 		return nil, err
 	}
-	//db := ouidb.New("manuf")
 	return &WebApp{
 		clock:        clock.New(),
 		config:       c,
