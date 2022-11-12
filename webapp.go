@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/benbjohnson/clock"
 	"github.com/davidscholberg/go-durationfmt"
 
 	"github.com/GPORTALcloud/ouidb/pkg/ouidb"
@@ -22,6 +23,7 @@ import (
 )
 
 type WebApp struct {
+	clock  clock.Clock
 	config Config
 	engine *gin.Engine
 	ouidb  *ouidb.OuiDB
@@ -60,8 +62,8 @@ func NewWebApp(c Config) (*WebApp, error) {
 	if err != nil {
 		return nil, err
 	}
-	//db := ouidb.New("manuf")
 	return &WebApp{
+		clock:        clock.New(),
 		config:       c,
 		engine:       gin.Default(),
 		ouidb:        db,
@@ -197,7 +199,7 @@ func (a *WebApp) mqttHandlerRoom(client MQTT.Client, msg MQTT.Message) {
 
 }
 func (a *WebApp) mqttHandlerRoomTelem(client MQTT.Client, msg MQTT.Message, roomName string) {
-	t := time.Now()
+	t := a.clock.Now()
 	var telem Telemetry
 	err := json.Unmarshal(msg.Payload(), &telem)
 	if err != nil {
@@ -212,7 +214,7 @@ func (a *WebApp) mqttHandlerRoomTelem(client MQTT.Client, msg MQTT.Message, room
 }
 
 func (a *WebApp) mqttHandlerRoomDevice(client MQTT.Client, msg MQTT.Message, roomName string) {
-	t := time.Now()
+	t := a.clock.Now()
 	var ping Ping
 	err := json.Unmarshal(msg.Payload(), &ping)
 	if err != nil {
@@ -245,7 +247,7 @@ func macColons(in string) string {
 }
 
 func (a *WebApp) mqttHandlerDevice(client MQTT.Client, msg MQTT.Message) {
-	t := time.Now()
+	t := a.clock.Now()
 	topic := msg.Topic()
 	tParts := strings.Split(topic, "/")
 	id := tParts[2]
@@ -272,7 +274,7 @@ func (a *WebApp) mqttHandlerDevice(client MQTT.Client, msg MQTT.Message) {
 
 func (a *WebApp) gcLocked() {
 	// GC deviceByName
-	gcThreshold := time.Now().Add(-30 * time.Second)
+	gcThreshold := a.clock.Now().Add(-30 * time.Second)
 	for id, device := range a.deviceByName {
 		var toGC []string
 		for room, ping := range device.Pings {
@@ -312,7 +314,7 @@ func (a *WebApp) gcLocked() {
 	}
 
 	// GC rooms
-	gcThreshold = time.Now().Add(-1 * time.Hour)
+	gcThreshold = a.clock.Now().Add(-1 * time.Hour)
 	var roomsToGc []string
 	for rName, room := range a.rooms {
 		if room.LastPing.Before(gcThreshold) {
